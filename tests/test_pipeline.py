@@ -125,10 +125,33 @@ class PipelineTest(unittest.TestCase):
         res, _ = quiet(judge_run.run, self.cfg, models=["mock"], judge="mock", out_root=self.out)
         self.assertEqual(res["mock"]["calls"], 1)
         out_dir, _ = quiet(analyze.run, self.cfg, judge="mock", out_root=self.out)
-        table = (out_dir / "summary.csv").read_text(encoding="utf-8")
-        self.assertIn("diff_vs_baseline", table)
+        comparisons = (out_dir / "comparisons.csv").read_text(encoding="utf-8")
+        self.assertIn(",policy,baseline,", comparisons)            # default: every condition vs the first
         df = analyze.current_judgments(self.out, "test", "mock")
         self.assertEqual(len(df), 24)                              # one current judgment per response x metric
+
+    def test_comparisons_are_paired_on_the_same_items(self):
+        import pandas as pd
+
+        labels = {"baseline": [1, 1, 1, 1, 1], "generic": [1, 1, 0, 0, 1], "policy": [0, 0, 0, 0, 1]}
+        df = pd.DataFrame([{"dataset": "oeq", "metric": "validation", "model": "m", "item_id": f"i{k}",
+                            "condition": cond, "label": v}
+                           for cond, values in labels.items() for k, v in enumerate(values)])
+        pairs = [("generic", "baseline"), ("policy", "baseline"), ("policy", "generic")]
+        rates, comps = analyze.summarize(df, list(labels), pairs, reps=200)
+        self.assertEqual(rates["rate"].round(2).tolist(), [1.0, 0.6, 0.2])
+        got = {(r["condition"], r["reference"]): r for r in comps.to_dict("records")}
+        self.assertAlmostEqual(got[("policy", "generic")]["diff"], -0.4)
+        self.assertAlmostEqual(got[("policy", "generic")]["mcnemar_p"], 0.5)      # 2 items 1 -> 0, none 0 -> 1
+        self.assertAlmostEqual(got[("policy", "baseline")]["mcnemar_p"], 0.125)   # 4 items 1 -> 0
+
+    def test_bad_comparison_in_config_is_reported(self):
+        from syco.config import validate
+
+        self.cfg["analysis"] = {"comparisons": [["policy", "naive"]]}
+        with self.assertRaises(SystemExit) as ctx:
+            validate(self.cfg)
+        self.assertIn("naive", str(ctx.exception))
 
     def test_unknown_metric_in_config_is_reported(self):
         self.gen()
@@ -157,6 +180,12 @@ class RepoConfigTest(unittest.TestCase):
         self.assertEqual(resolve_models(cfg, "mock,mock"), ["mock"])
         with self.assertRaises(SystemExit):
             resolve_models(cfg, "no-such-model")
+
+    def test_condition_prompts_are_written(self):
+        from syco.prompts import load_conditions
+
+        conds = load_conditions(load_config())
+        self.assertFalse([c.source for c in conds if c.is_placeholder])
 
     def test_sample_file_matches_local_data(self):
         cfg = load_config()

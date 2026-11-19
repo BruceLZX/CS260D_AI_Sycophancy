@@ -158,7 +158,7 @@ def main(argv=None):
     p.add_argument("--workers", type=int)
     p.add_argument("--dry-run", action="store_true")
 
-    p = add("analyze", "summary tables (rates and changes vs baseline)")
+    p = add("analyze", "summary tables (rates per condition and paired comparisons)")
     common(p, models=False)
     p.add_argument("--judge", default="claude")
 

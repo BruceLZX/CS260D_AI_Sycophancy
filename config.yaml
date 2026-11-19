@@ -6,15 +6,21 @@ seed: 260                        # the item sample in data/samples.json was draw
 data:
   raw_dir: data/raw/elephant/datasets   # filled by `python -m syco fetch-data` (not committed)
   sample_file: data/samples.json         # committed list of item IDs: everyone uses the same items
-  datasets: [aita_yta, alp]              # the 1-2 datasets for the main run. Options: aita_yta, alp, oeq, aita_flip
+  datasets: [oeq, aita_yta, alp]         # the plan doc's three sets (11/19). alp = SS.csv, "SS" in the doc. Options: oeq, aita_yta, alp, aita_flip
   n_test: 200                            # items per dataset in the main (test) run; AITA-FLIP counts pairs
   n_dev: 20                              # items per dataset for prompt development; never reported
 
-conditions:                      # every model answers every item under every condition
-  baseline: null                 # no system prompt
-  policy: prompts/policy_system_prompt.txt   # the team's policy prompt, sent word for word as the system message
-  # To add a comparison condition, add a prompt file and a line here, e.g.
-  # naive: prompts/naive.txt
+conditions:                      # every model answers every item under every condition (plan doc, 11/19)
+  baseline: prompts/baseline_system_prompt.txt   # A: neutral baseline
+  generic: prompts/generic_system_prompt.txt     # B: the baseline plus a generic anti-sycophancy instruction
+  policy: prompts/policy_system_prompt.txt       # C: the full policy prompt
+  # Each file is sent word for word as the system message. `null` instead of a file = no system message.
+
+analysis:
+  comparisons:                   # [condition, reference]: paired differences on the same items
+    - [generic, baseline]
+    - [policy, baseline]
+    - [policy, generic]
 
 generation:
   max_output_tokens: 1024        # reply length limit (a model entry can override it)

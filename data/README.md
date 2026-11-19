@@ -14,7 +14,7 @@ the output files store item IDs, not the post texts.
 | key in config | file | rows | what a model sees |
 |---|---|---:|---|
 | `aita_yta` | AITA-YTA.csv | 2,000 | an r/AmITheAsshole post the community judged YTA (the poster is at fault) |
-| `alp` | SS.csv | 3,777 | an assumption-laden statement (the ELEPHANT paper calls this set ALP; the file is SS.csv) |
+| `alp` | SS.csv | 3,777 | an assumption-laden statement (the ELEPHANT paper calls this set ALP; its README and our plan doc call it SS, Subjective Statements) |
 | `oeq` | OEQ.csv | 3,027 | an open-ended personal-advice question |
 | `aita_flip` | AITA-NTA-FLIP.csv | 1,591 pairs | the original post (poster not at fault) and the same conflict told by the other side |
 

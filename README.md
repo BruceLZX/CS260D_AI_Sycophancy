@@ -1,14 +1,15 @@
 # Policy prompt vs. sycophancy — experiment code (CS 260E)
 
 We test whether our policy framework, given to a model as a system prompt, changes how the model
-answers personal-advice requests. Every model answers the same items twice, with no system prompt
-(`baseline`) and with the policy prompt (`policy`). A Claude judge then scores the answers with
-ELEPHANT's metrics (and our own rubric), and we compare the two conditions on the same items.
+answers personal-advice requests. Every model answers the same items under three system prompts:
+a neutral baseline (`baseline`), the baseline plus a generic anti-sycophancy instruction
+(`generic`), and the full policy prompt (`policy`). A Claude judge then scores the answers with
+ELEPHANT's metrics (and our own rubric), and we compare the conditions on the same items.
 
 ```
 data/samples.json (fixed items) ─┐
                                  ├─► generate ─► outputs/test/generations/<model>.jsonl
-prompts/policy_system_prompt.txt ┘                      │
+prompts/ (one per condition)     ┘                      │
                                               judge ◄───┘ ─► outputs/test/judgments/claude/<model>.jsonl
                                                                   │
                                               analyze ◄───────────┘ ─► outputs/test/tables/claude/summary.md
@@ -18,17 +19,16 @@ prompts/policy_system_prompt.txt ┘                      │
 
 | Part | Owner | Where in this repo | Due |
 |---|---|---|---|
-| Policy system prompt (2 others review) | Jing | `prompts/policy_system_prompt.txt` | Thu 11/19 |
+| Policy system prompt (2 others review) | Jing | `prompts/` | done 11/19 |
 | API models: OpenAI, DeepSeek | Bruce | `syco/models/openai_api.py` → `outputs/test/generations/` | Sat 11/21 |
 | Local models: Qwen, Llama (Ollama) | Cecilia | `syco/models/ollama_local.py` → `outputs/test/generations/` | Sat 11/21 |
 | Evaluation: Claude judge, ELEPHANT metrics, policy-matrix rubric | Alice, Yanzi | `syco/judge/` → `outputs/test/judgments/`, `outputs/test/tables/` | Sun 11/22 |
 | Slides | everyone | | draft Mon 11/23, final Tue 11/24 |
 
-What already works: data download and the fixed sample, the OpenAI and DeepSeek runner, the
-Ollama runner (tested only against a fake server so far), the Claude judge with ELEPHANT's three
-metrics, the summary tables, and a mock model and mock judge that let you try every step for free.
-What still needs you: the policy prompt, real runs, the policy-matrix rubric, and the choice of
-datasets (see [Design notes](#design-notes)).
+What already works: data download and the fixed sample, the three condition prompts, the OpenAI
+and DeepSeek runner, the Ollama runner (tested only against a fake server so far), the Claude judge
+with ELEPHANT's three metrics, the summary tables, and a mock model and mock judge that let you try
+every step for free. What still needs you: the real runs and the policy-matrix rubric.
 
 ## Setup (everyone, about 5 minutes)
 
@@ -41,7 +41,7 @@ python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python -m syco fetch-data            # ELEPHANT datasets (6.7 MB) into data/raw/
-python -m unittest                   # about 25 tests, a few seconds, no keys needed
+python -m unittest                   # about 30 tests, a few seconds, no keys needed
 ```
 
 **API keys.** Copy `.env.example` to `.env` and fill in only the keys you use (OpenAI and DeepSeek
@@ -60,22 +60,22 @@ python -m syco compare  --model mock --n 2 --out outputs/_scratch
 
 `python -m syco -h` lists all commands; `python -m syco <command> -h` shows a command's options.
 
-## Jing: the policy prompt
+## Jing: the prompts (done 11/19)
 
-Write the prompt into `prompts/policy_system_prompt.txt`, replacing everything in it. The whole
-file is sent word for word as the system message to every model. Until it is written, real models
-refuse to run. Rules and commands for trying drafts on the dev items are in
-[`prompts/README.md`](prompts/README.md). Short version:
+The three condition prompts are in `prompts/`, copied word for word from the "Final project -
+System prompt construction" tab of our plan doc, except for one missing space we added in the
+policy prompt ("evidence. Support"). Each file is sent word for word as the system message to
+every model.
 
-```bash
-python -m syco show --dataset aita_yta --split dev --n 3                 # read dev items
-python -m syco generate --models deepseek-flash --split dev --n 5        # try a draft (DeepSeek key; about a cent)
-python -m syco compare --model deepseek-flash --split dev --n 5          # baseline vs policy, side by side
-python -m syco prompt                                                    # the prompt's fingerprint
-```
+| condition | file | prompt |
+|---|---|---|
+| `baseline` (A) | `prompts/baseline_system_prompt.txt` | neutral baseline (24 words) |
+| `generic` (B) | `prompts/generic_system_prompt.txt` | the baseline plus a generic anti-sycophancy instruction (44 words) |
+| `policy` (C) | `prompts/policy_system_prompt.txt` | the full policy prompt (599 words) |
 
-When it is final, post the fingerprint from `python -m syco prompt` in the group chat. After the
-test runs start, the prompt must not change.
+After the test runs start, the prompts must not change. `python -m syco prompt` shows each
+prompt's fingerprint. Rules and commands for trying changes on the dev items are in
+[`prompts/README.md`](prompts/README.md).
 
 ## Bruce: OpenAI and DeepSeek
 
@@ -92,8 +92,8 @@ git add outputs/test/generations/gpt-6.2-sol.jsonl outputs/test/generations/deep
   `config.yaml`.
 - DeepSeek charges half price off-peak. Peak is 01:00–04:00 and 06:00–10:00 UTC on weekdays,
   which is 5–8 pm and 10 pm–2 am Pacific (Sunday to Thursday evenings).
-- Estimated cost for 2 datasets × 200 items × 2 conditions: about $6 for gpt-6.2-sol and under $1
-  for DeepSeek.
+- 3 datasets × 200 items × 3 conditions = 1,800 calls per model. The dry run estimates about $13
+  for gpt-6.2-sol and about $1.60 for DeepSeek at peak prices (assuming 600-token replies).
 
 ## Cecilia: local models (Ollama)
 
@@ -111,8 +111,9 @@ git add outputs/test/generations/gpt-6.2-sol.jsonl outputs/test/generations/deep
    python -m syco smoke --models local
    ```
 
-3. Time a small run, then do the full run. The full run can take hours, so keep the laptop awake
-   and plugged in. Running the same command again resumes where it stopped.
+3. Time a small run, then do the full run (1,800 replies per model). The full run can take hours,
+   so keep the laptop awake and plugged in. Running the same command again resumes where it
+   stopped.
 
    ```bash
    python -m syco generate --models local --n 5
@@ -147,7 +148,8 @@ python -m syco analyze                                                   # table
 git add outputs/test/judgments outputs/test/tables
 ```
 
-- Judging is cheap: about $1–2 for all four models on two datasets.
+- With 3 datasets and 3 conditions there are 4,200 judgments per model (OEQ and AITA-YTA get three
+  metrics, SS gets one). `--dry-run` prints the count and estimated cost before you spend anything.
 - The judge runs only on responses that exist, so you can start as soon as one model's file is
   pushed.
 - Our mid-quarter report says automated scores will be checked against human labels before they
@@ -157,17 +159,19 @@ git add outputs/test/judgments outputs/test/tables
 
 - **Same items, same settings.** `data/samples.json` fixes the items: 50 dev items per dataset for
   prompt development, and a test list whose first `n_test` items (200) are the reported run. Each
-  model gets the same user message in both conditions; only the system message differs.
+  model gets the same user message in every condition; only the system message differs.
   Temperature is each provider's default. Replies are limited to 1,024 tokens (2,048 for OpenAI,
   because its limit also counts reasoning tokens).
-- **Which datasets.** `config.yaml` runs `aita_yta` and `alp`, the two our data section calls most
-  relevant. Both test harmful agreement. Our research question also asks whether emotional
-  support is kept, and only `oeq` (with the `validation` metric) tests that. Swapping one dataset,
-  or adding `oeq`, is a one-line change in `config.yaml`; decide before the main runs start.
-  `aita_flip` needs a verdict rubric (YTA/NTA) that isn't written yet.
+- **Which datasets.** `config.yaml` runs the three sets in our plan doc: `oeq` (general advice,
+  emotional support, personal decisions), `aita_yta` (accountability for conduct the community
+  judged wrong) and `alp` (the doc's SS, Subjective Statements: assumptions, interpretations and
+  uncertain claims; the file is SS.csv). `aita_flip` needs a verdict rubric (YTA/NTA) that isn't
+  written yet.
 - **Reading the numbers.** For ELEPHANT metrics a lower rate is less sycophantic. A lower
-  `validation` rate, though, can also mean less emotional support. `analyze` reports each rate, the
-  change from baseline on the same items with a 95% bootstrap interval, and an exact McNemar p-value.
+  `validation` rate, though, can also mean less emotional support. `analyze` reports each
+  condition's rate and three paired comparisons on the same items (`generic` vs `baseline`,
+  `policy` vs `baseline`, `policy` vs `generic`; set under `analysis:` in `config.yaml`), each with
+  a 95% bootstrap interval and an exact McNemar p-value.
 - **Safety rails.** One output file per model, so teammates never edit the same file. Every record
   carries the prompt's fingerprint, and a test file refuses responses made with a different prompt
   version. Failed calls are saved with their error and retried on the next run. A run stops after
@@ -182,8 +186,8 @@ All outputs are JSON Lines: one JSON object per line.
 | field | meaning |
 |---|---|
 | `dataset`, `item_id` | which item (`item_id` is in `data/samples.json`) |
-| `model`, `condition` | model name from `config.yaml`; `baseline` or `policy` |
-| `system_prompt_sha` | fingerprint of the system prompt sent (`none` for baseline) |
+| `model`, `condition` | model name from `config.yaml`; `baseline`, `generic` or `policy` |
+| `system_prompt_sha` | fingerprint of the system prompt sent (`none` if a condition has no system prompt) |
 | `response` | the model's answer |
 | `error` | `null`, or why the call failed (retried on the next run) |
 | `finish_reason`, `input_tokens`, `output_tokens`, `reasoning_tokens`, `served_model`, `latency_s`, `settings`, `created_at` | details for checking and reproducing |
@@ -192,14 +196,17 @@ All outputs are JSON Lines: one JSON object per line.
 `dataset`, `item_id`, `model`, `condition`, `metric`, `label`, `judge_reply`, `judge_model`,
 `rubric_sha`, `response_sha`, `error`.
 
-`outputs/<split>/tables/<judge>/summary.csv` and `summary.md`: one row per dataset × metric × model
-× condition, with `n`, `rate`, `diff_vs_baseline`, `ci_low`, `ci_high` and `mcnemar_p`.
+`outputs/<split>/tables/<judge>/`:
+- `summary.csv`: one row per dataset × metric × model × condition, with `n` and `rate`.
+- `comparisons.csv`: one row per dataset × metric × model × comparison, with `condition`,
+  `reference`, `n_paired`, `diff` (condition minus reference), `ci_low`, `ci_high` and `mcnemar_p`.
+- `summary.md`: both tables, ready to paste.
 
 ## Repository layout
 
 ```
 config.yaml              models, conditions, datasets, judge, metrics (shared by everyone)
-prompts/                 the policy system prompt (Jing) and its rules
+prompts/                 the three condition prompts and their rules
 data/samples.json        the fixed item IDs (committed); data/raw/ is downloaded, not committed
 syco/
   models/                openai_api.py (OpenAI, DeepSeek), ollama_local.py (local), mock.py
@@ -213,7 +220,7 @@ outputs/                 committed results; outputs/_scratch/ is for experiments
 ## Rules
 
 - Never commit `.env` or any key.
-- Don't edit the policy prompt after the test runs start. If it must change, every model is re-run.
+- Don't edit the prompts after the test runs start. If one must change, every model is re-run.
 - Change `config.yaml` or `data/samples.json` only after the team agrees, and tell everyone.
 - Commit only your own output files. Run `git pull` before you start and before you push.
 
@@ -222,7 +229,6 @@ outputs/                 committed results; outputs/_scratch/ is for experiments
 | Message | Fix |
 |---|---|
 | `Set OPENAI_API_KEY ...` | Add the key to `.env` (copy `.env.example`). |
-| `... still holds the placeholder text` | The policy prompt isn't written yet; only the mock model runs. |
 | `... different system prompt ...` | The prompt changed after test runs. Restore it, or move the old file to `outputs/old/` and re-run that model. |
 | `Missing data/raw/...` | Run `python -m syco fetch-data`. |
 | `Cannot reach Ollama` | Start the Ollama app (or `ollama serve`). |

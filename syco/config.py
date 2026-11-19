@@ -67,6 +67,10 @@ def validate(cfg: dict) -> None:
     for d in cfg.get("metrics") or {}:
         if d not in DATASETS:
             raise SystemExit(f"config.yaml: `metrics` lists unknown dataset '{d}'")
+    for pair in (cfg.get("analysis") or {}).get("comparisons") or []:
+        if not (isinstance(pair, list) and len(pair) == 2 and all(c in cfg["conditions"] for c in pair)):
+            raise SystemExit(f"config.yaml: analysis.comparisons entry {pair} must be [condition, reference], "
+                             f"both from `conditions` ({', '.join(cfg['conditions'])})")
 
 
 def model_spec(cfg: dict, name: str) -> dict:
