@@ -1,0 +1,72 @@
+# Experiment configuration. Everyone runs with this file, so models, items and settings are the
+# same on every machine. Change it only when the team agrees, and tell the others.
+
+seed: 260                        # the item sample in data/samples.json was drawn with this seed
+
+data:
+  raw_dir: data/raw/elephant/datasets   # filled by `python -m syco fetch-data` (not committed)
+  sample_file: data/samples.json         # committed list of item IDs: everyone uses the same items
+  datasets: [aita_yta, alp]              # the 1-2 datasets for the main run. Options: aita_yta, alp, oeq, aita_flip
+  n_test: 200                            # items per dataset in the main (test) run; AITA-FLIP counts pairs
+  n_dev: 20                              # items per dataset for prompt development; never reported
+
+conditions:                      # every model answers every item under every condition
+  baseline: null                 # no system prompt
+  policy: prompts/policy_system_prompt.txt   # the team's policy prompt, sent word for word as the system message
+  # To add a comparison condition, add a prompt file and a line here, e.g.
+  # naive: prompts/naive.txt
+
+generation:
+  max_output_tokens: 1024        # reply length limit (a model entry can override it)
+  temperature: null              # null = each provider's default
+  retries: 6                     # retries for rate limits, timeouts and server errors
+
+models:
+  # ---- API models (owner: Bruce). Model IDs and prices checked 2026-11-18; confirm with `smoke`. ----
+  - name: gpt-6.2-sol
+    provider: openai
+    model: gpt-6.2-sol            # OpenAI's mid tier. Cheaper option: gpt-6-luna ($0.10 / $0.50)
+    max_output_tokens: 2048       # OpenAI counts reasoning tokens against this limit
+    params: {reasoning_effort: low}
+    workers: 8                    # parallel calls
+    price_per_million: {input: 2.00, output: 10.00}
+  - name: deepseek-flash
+    provider: deepseek
+    model: deepseek-flash         # DeepSeek-V4.1-Flash-1017. Larger option: deepseek-v4-pro ($1.32 / $3.96)
+    params: {thinking: disabled}  # DeepSeek thinks by default
+    workers: 8
+    price_per_million: {input: 0.30, output: 1.20}   # peak hours; off-peak is half (see README)
+
+  # ---- local open-weight models through Ollama (owner: Cecilia). Tags from ollama.com/library. ----
+  - name: qwen3.5-9b
+    provider: ollama
+    model: qwen3.5:9b
+    params: {think: false, num_ctx: 8192}   # Qwen thinks by default; num_ctx fits long posts + the prompt
+    workers: 1
+  - name: llama3.1-8b
+    provider: ollama
+    model: llama3.1:8b
+    params: {num_ctx: 8192}
+    workers: 1
+
+  # ---- fake model: tries the whole pipeline with no key and no cost ----
+  - name: mock
+    provider: mock
+    model: mock
+    workers: 4
+
+judges:                          # owners: Alice + Yanzi
+  claude:
+    provider: anthropic
+    model: claude-haiku-5-5
+    thinking: {type: disabled}   # short label answers; no reasoning needed
+    workers: 8
+    price_per_million: {input: 0.10, output: 0.50}
+  mock:                          # fake labels, for testing the judge step for free
+    provider: mock
+
+metrics:                         # judge metrics per dataset (names from syco/judge/rubrics.py)
+  aita_yta: [validation, indirectness, framing]
+  alp: [framing]
+  oeq: [validation, indirectness, framing]
+  aita_flip: []                  # needs a YTA/NTA verdict rubric (not written yet)

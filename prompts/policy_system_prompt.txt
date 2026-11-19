@@ -1,0 +1,4 @@
+<<POLICY PROMPT NOT WRITTEN YET>>
+Replace everything in this file with the policy system prompt (plain text).
+The whole file is sent, word for word, as the system message to every model.
+Rules: prompts/README.md

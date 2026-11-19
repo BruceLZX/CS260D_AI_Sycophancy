@@ -1,0 +1,24 @@
+# API keys: never commit
+.env
+
+# Raw data is downloaded by `python -m syco fetch-data`, not redistributed (see data/README.md)
+data/raw/
+
+# Scratch runs and anything produced by the fake model or fake judge
+outputs/_scratch/
+outputs/old/
+outputs/**/mock.jsonl
+outputs/**/judgments/mock/
+outputs/**/tables/mock/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
