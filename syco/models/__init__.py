@@ -12,6 +12,8 @@ def get_model(spec: dict, gen_cfg: dict) -> ChatModel:
         from .openai_api import DeepSeekChat as cls
     elif provider == "ollama":
         from .ollama_local import OllamaChat as cls
+    elif provider == "bolei":
+        from .bolei_local import BoleiChat as cls
     elif provider == "mock":
         from .mock import MockChat as cls
     else:

@@ -21,7 +21,7 @@ prompts/ (one per condition)     ┘                      │
 |---|---|---|---|
 | Policy system prompt (2 others review) | Jing | `prompts/` | done 11/19 |
 | API models: OpenAI, DeepSeek | Bruce | `syco/models/openai_api.py` → `outputs/test/generations/` | Sat 11/21 |
-| Local models: Qwen, Llama (Ollama) | Cecilia | `syco/models/ollama_local.py` → `outputs/test/generations/` | Sat 11/21 |
+| Local models: Qwen, Llama (Ollama or Bolei) | Cecilia | `syco/models/` → `outputs/test/generations/` | Sat 11/21 |
 | Evaluation: Claude judge, ELEPHANT metrics, policy-matrix rubric | Alice, Yanzi | `syco/judge/` → `outputs/test/judgments/`, `outputs/test/tables/` | Sun 11/22 |
 | Slides | everyone | | draft Mon 11/23, final Tue 11/24 |
 
@@ -128,6 +128,46 @@ The settings are in `config.yaml`: `think: false` (Qwen thinks by default) and `
 the models some other way (for example on Colab), add a backend class in `syco/models/` that follows
 `ChatModel` in `syco/models/base.py` and register it in `syco/models/__init__.py`. Keep the same
 model names, so the output files stay comparable.
+
+### Cecilia: Bolei GPU backend (3B checkpoints)
+
+[`syco/models/bolei_local.py`](syco/models/bolei_local.py) uses the same frozen prompts and
+fixed sample IDs as the other backends. The optional [model profile](config.bolei.yaml)
+adds Qwen2.5-3B-Instruct and Llama-3.2-3B-Instruct. Each uses BF16, greedy decoding and
+the shared 1,024-token limit. The pinned Unsloth Llama distribution has matching Meta
+weight shards and supplies its own config and chat template.
+
+Use a compute-visible Python environment with the repository requirements, CUDA PyTorch
+2.9 and Transformers 4.57.6. Use an environment without the old Bolei FlashAttention wheel.
+Set `HF_HUB_CACHE` to a shared path and stage the pinned snapshots before allocating a GPU.
+
+```bash
+python - <<'PY'
+from huggingface_hub import snapshot_download
+from syco.config import load_config
+for model in load_config(model_config="config.bolei.yaml")["models"]:
+    if model["provider"] == "bolei":
+        snapshot_download(model["model"], revision=model["params"]["revision"],
+                          allow_patterns=["*.json", "*.safetensors", "*.txt", "*.jinja"])
+PY
+python -m syco fetch-data
+python -m syco --model-config config.bolei.yaml generate --models qwen2.5-3b,llama3.2-3b --dry-run
+```
+
+Submit from the repository root with the Bolei partition, a wall time, and the shared
+Python executable. Append `--n 1 --out outputs/_scratch/bolei` for a nine-answer smoke
+test per model. Then submit the same jobs without those arguments for the reportable test.
+
+```bash
+sbatch --partition=a5000 --time=12:00:00 scripts/run_bolei.sbatch "$python_bin" qwen2.5-3b
+sbatch --partition=a5000 --time=12:00:00 scripts/run_bolei.sbatch "$python_bin" llama3.2-3b
+python -m syco --model-config config.bolei.yaml status
+```
+
+The test writes `outputs/test/generations/qwen2.5-3b.jsonl` and
+`outputs/test/generations/llama3.2-3b.jsonl`, 1,800 answers each. Use
+`--model-config config.bolei.yaml` before the `judge` command to select these models.
+The standalone full-dataset pilot used the earlier policy text and is a separate run.
 
 ## Alice and Yanzi: evaluation
 
