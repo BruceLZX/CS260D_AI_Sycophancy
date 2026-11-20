@@ -23,7 +23,7 @@ analysis:
     - [policy, generic]
 
 generation:
-  max_output_tokens: 1024        # reply length limit (a model entry can override it)
+  max_output_tokens: 2048        # reply length limit for every model; OpenAI counts reasoning tokens in it (1024 cut off 3% of DeepSeek replies)
   temperature: null              # null = each provider's default
   retries: 6                     # retries for rate limits, timeouts and server errors
 
@@ -32,7 +32,6 @@ models:
   - name: gpt-6.2-sol
     provider: openai
     model: gpt-6.2-sol            # OpenAI's mid tier. Cheaper option: gpt-6-luna ($0.10 / $0.50)
-    max_output_tokens: 2048       # OpenAI counts reasoning tokens against this limit
     params: {reasoning_effort: low}
     workers: 8                    # parallel calls
     price_per_million: {input: 2.00, output: 10.00}

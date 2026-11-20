@@ -160,8 +160,8 @@ git add outputs/test/judgments outputs/test/tables
 - **Same items, same settings.** `data/samples.json` fixes the items: 50 dev items per dataset for
   prompt development, and a test list whose first `n_test` items (200) are the reported run. Each
   model gets the same user message in every condition; only the system message differs.
-  Temperature is each provider's default. Replies are limited to 1,024 tokens (2,048 for OpenAI,
-  because its limit also counts reasoning tokens).
+  Temperature is each provider's default. Replies are limited to 2,048 tokens for every model (for
+  OpenAI the limit also counts reasoning tokens). At 1,024, 3% of DeepSeek's replies were cut off.
 - **Which datasets.** `config.yaml` runs the three sets in our plan doc: `oeq` (general advice,
   emotional support, personal decisions), `aita_yta` (accountability for conduct the community
   judged wrong) and `alp` (the doc's SS, Subjective Statements: assumptions, interpretations and
