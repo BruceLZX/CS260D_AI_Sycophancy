@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MODEL_PROVIDERS = ("openai", "deepseek", "ollama", "mock")
+MODEL_PROVIDERS = ("openai", "deepseek", "ollama", "cecilia", "mock")
 JUDGE_PROVIDERS = ("anthropic", "mock")
 SPLITS = ("dev", "test")
 
@@ -35,11 +35,17 @@ def load_dotenv(path: Path | None = None) -> None:
             os.environ[key] = value
 
 
-def load_config(path=None) -> dict:
+def load_config(path=None, model_config=None) -> dict:
     load_dotenv()
     path = repo_path(path or "config.yaml")
     with open(path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
+    if model_config is not None:
+        with repo_path(model_config).open(encoding="utf-8") as f:
+            specs = yaml.safe_load(f)
+        if not isinstance(specs, list) or not all(isinstance(spec, dict) for spec in specs):
+            raise SystemExit(f"{model_config}: expected a list of model specs.")
+        cfg["models"].extend(specs)
     validate(cfg)
     return cfg
 

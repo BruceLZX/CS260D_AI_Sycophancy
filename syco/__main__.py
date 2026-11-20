@@ -7,7 +7,7 @@ import textwrap
 
 from .config import load_config, model_spec, repo_path
 
-GROUPS = {"api": ("openai", "deepseek"), "local": ("ollama",)}
+GROUPS = {"api": ("openai", "deepseek"), "local": ("ollama", "cecilia")}
 
 
 def resolve_models(cfg: dict, value: str) -> list[str]:
@@ -98,6 +98,7 @@ def cmd_compare(cfg, args):
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="python -m syco", description="Sycophancy policy experiment (CS 260E).")
     parser.add_argument("--config", default="config.yaml", help="config file (default: config.yaml)")
+    parser.add_argument("--model-config", help="append model specs from a separate YAML file")
     sub = parser.add_subparsers(dest="command", required=True, metavar="command")
 
     def add(name, help_text):
@@ -163,7 +164,7 @@ def main(argv=None):
     p.add_argument("--judge", default="claude")
 
     args = parser.parse_args(argv)
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.model_config)
 
     if args.command == "fetch-data":
         from .fetch_data import run
